@@ -1,9 +1,9 @@
 # exprjit
 Mathematical expressions evaluation using JIT compiler.
 
-This is simple parser that wraps [NativeJIT](https://github.com/BitFunnel/NativeJIT) library to compile and evaluate mathematical expressions.
+This is a simple parser that wraps [NativeJIT](https://github.com/BitFunnel/NativeJIT) library to compile and evaluate mathematical expressions.
 
-For example:
+Example:
 ```cpp
 ExprJIT expr;
 
