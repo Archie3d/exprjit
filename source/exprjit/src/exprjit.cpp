@@ -481,7 +481,18 @@ static ExprJIT::Real mod(ExprJIT::Real x, ExprJIT::Real y) { return ::fmod(x, y)
 static ExprJIT::Real atan2(ExprJIT::Real x, ExprJIT::Real y) { return ::atan2(x, y); }
 static ExprJIT::Real hypot(ExprJIT::Real x, ExprJIT::Real y) { return ::hypot(x, y); }
 
+// 3-argument functions
+static ExprJIT::Real clamp(ExprJIT::Real x, ExprJIT::Real a, ExprJIT::Real b)
+{
+    if (x < a) {
+        return a;
+    } else if (x > b) {
+        return b;
+    }
+    return x;
 }
+
+} // namespace func
 
 const std::map<std::string, Parser::Function1Ptr> Parser::stdFunctions1 = {
     { "abs",    func::abs },
@@ -518,6 +529,7 @@ const std::map<std::string, Parser::Function2Ptr> Parser::stdFunctions2 = {
 };
 
 const std::map<std::string, Parser::Function3Ptr> Parser::stdFunctions3 = {
+    { "clamp",   func::clamp }
 };
 
 //----------------------------------------------------------

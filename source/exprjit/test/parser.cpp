@@ -66,3 +66,21 @@ TEST_CASE("Test 2-argument functions")
     REQUIRE(expr("max(2.0, 5.0)"));
     REQUIRE(expr() == Approx(5.0));
 }
+
+//----------------------------------------------------------
+
+TEST_CASE("Test 3-argument functions")
+{
+    ExprJIT expr;
+    expr["x"] = 0.0;
+
+    REQUIRE(expr("clamp(x, -1, 1)"));
+
+    REQUIRE(expr() == Approx(0.0));
+
+    expr["x"] = 10.0;
+    REQUIRE(expr() == Approx(1.0));
+
+    expr["x"] = -10.0;
+    REQUIRE(expr() == Approx(-1.0));
+}
