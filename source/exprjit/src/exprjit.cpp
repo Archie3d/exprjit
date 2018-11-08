@@ -95,7 +95,8 @@ public:
         : m_nodeFactory(nodeFactory),
           m_symbols(symbols),
           m_error(false),
-          m_message()
+          m_message(),
+          m_symbolsCache()
     {
     }
 
@@ -104,6 +105,8 @@ public:
 
     Node& parse(const std::string &str)
     {
+        m_symbolsCache.clear();
+
         std::istringstream ss(str);
         return parseExpression(ss);
     }
@@ -325,11 +328,22 @@ private:
             }
 
         } else {
+
             // Variable reference
             ExprJIT::Real *ptr = m_symbols.varPtr(identifier);
             if (ptr != nullptr) {
-                auto &imm = m_nodeFactory.Immediate(ptr);
-                return m_nodeFactory.Deref(imm);
+                // Look of there is a cached node for this variable
+                auto it = m_symbolsCache.find(identifier);
+                if (it == m_symbolsCache.end()) {
+                    // Create the reference node and cache it
+                    auto &imm = m_nodeFactory.Immediate(ptr);
+                    auto &node = m_nodeFactory.Deref(imm);
+                    m_symbolsCache.insert(std::pair<std::string, Node&>(identifier, node));
+                    return node;
+                } else {
+                    // Return cached node
+                    return it->second;
+                }
             }
         }
 
@@ -433,9 +447,12 @@ private:
 #undef PARSE_ERR
 
     nj::ExpressionNodeFactory &m_nodeFactory;
-    SymbolTable &m_symbols;
+    SymbolTable &m_symbols; ///< External variables.
     bool m_error;           ///< Parsing error flag.
     std::string m_message;  ///< Error message.
+
+    /// Cache for variables Deref nodes.
+    std::map<std::string, Node&> m_symbolsCache;
 
     /// Standard functions
     const static std::map<std::string, Function1Ptr> stdFunctions1; ///< With 1 argument
@@ -553,6 +570,8 @@ struct Compiler
           func(nullptr),
           parser(expression, symbols)
     {
+        // This will output generated assembly
+        // code.EnableDiagnostics(std::cout);
     }
 
     bool compile(const std::string &str)

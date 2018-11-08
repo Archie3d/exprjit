@@ -28,6 +28,11 @@ TEST_CASE("Test external variables")
 
     expr["x"] = 10.0;
     REQUIRE(expr() == Approx(10.0));
+
+    expr["x"] = 2.0;
+
+    REQUIRE(expr("x + x + x"));
+    REQUIRE(expr() == Approx(6.0));
 }
 
 //----------------------------------------------------------
