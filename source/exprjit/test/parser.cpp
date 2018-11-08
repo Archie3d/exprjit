@@ -47,3 +47,22 @@ TEST_CASE("Test standard functions")
 
     REQUIRE_FALSE(expr("undefined(0.0)"));
 }
+
+//----------------------------------------------------------
+
+TEST_CASE("Test 2-argument functions")
+{
+    ExprJIT expr;
+
+    REQUIRE(expr("min(5.0, 2.0)"));
+    REQUIRE(expr() == Approx(2.0));
+
+    REQUIRE(expr("min(2.0, 5.0)"));
+    REQUIRE(expr() == Approx(2.0));
+
+    REQUIRE(expr("max(5.0, 2.0)"));
+    REQUIRE(expr() == Approx(5.0));
+
+    REQUIRE(expr("max(2.0, 5.0)"));
+    REQUIRE(expr() == Approx(5.0));
+}

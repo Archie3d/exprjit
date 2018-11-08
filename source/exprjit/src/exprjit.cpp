@@ -87,7 +87,9 @@ class Parser final
 public:
     using Node = nj::Node<ExprJIT::Real>;
 
-    typedef ExprJIT::Real (*FunctionPtr)(ExprJIT::Real);
+    typedef ExprJIT::Real (*Function1Ptr)(ExprJIT::Real);
+    typedef ExprJIT::Real (*Function2Ptr)(ExprJIT::Real, ExprJIT::Real);
+    typedef ExprJIT::Real (*Function3Ptr)(ExprJIT::Real, ExprJIT::Real, ExprJIT::Real);
 
     Parser(nj::ExpressionNodeFactory &nodeFactory, SymbolTable &symbols)
         : m_nodeFactory(nodeFactory),
@@ -276,12 +278,52 @@ private:
         c = in.peek();
         if (c == '(') {
             // Function call
-            auto it = Parser::stdFunctions.find(identifier);
-            if (it != Parser::stdFunctions.end()) {
-                Node &arg = parseTerm(in);
-                auto &call = m_nodeFactory.Immediate(it->second);
-                return m_nodeFactory.Call(call, arg);
+            in.get();
+            Node &arg0 = parseTerm(in);
+            Parser::skipSpace(in);
+            c = in.peek();
+            if (c == ')') {
+                in.get();
+                // 1-argument function
+                auto it = Parser::stdFunctions1.find(identifier);
+                if (it != Parser::stdFunctions1.end()) {
+                    auto &func = m_nodeFactory.Immediate(it->second);
+                    return m_nodeFactory.Call(func, arg0);
+                }
+            } else if (c == ',') {
+                in.get();
+                Node &arg1 = parseTerm(in);
+                Parser::skipSpace(in);
+                c = in.peek();
+                if (c == ')') {
+                    in.get();
+                    // 2-arguments
+                    auto it = Parser::stdFunctions2.find(identifier);
+                    if (it != Parser::stdFunctions2.end()) {
+                        auto &func = m_nodeFactory.Immediate(it->second);
+                        return m_nodeFactory.Call(func, arg0, arg1);
+                    }
+                } else if (c == ',') {
+                    in.get();
+                    Node &arg2 = parseTerm(in);
+                    Parser::skipSpace(in);
+                    c = in.peek();
+                    if (c == ')') {
+                        in.get();
+                        // 3-arguments
+                        auto it = Parser::stdFunctions3.find(identifier);
+                        if (it != Parser::stdFunctions3.end()) {
+                            auto &func = m_nodeFactory.Immediate(it->second);
+                            return m_nodeFactory.Call(func, arg0, arg1, arg2);
+                        }
+                    } else if (c == ',') {
+                        // Too many arguments
+                        PARSE_ERR << "Too many arguments for '" << identifier << "' function call";
+                        return m_nodeFactory.Immediate(0.0);
+                    }
+                }
             }
+
         } else {
             // Variable reference
             ExprJIT::Real *ptr = m_symbols.varPtr(identifier);
@@ -396,7 +438,9 @@ private:
     std::string m_message;  ///< Error message.
 
     /// Standard functions
-    const static std::map<std::string, FunctionPtr> stdFunctions;
+    const static std::map<std::string, Function1Ptr> stdFunctions1; ///< With 1 argument
+    const static std::map<std::string, Function2Ptr> stdFunctions2; ///< With 2 arguments
+    const static std::map<std::string, Function3Ptr> stdFunctions3; ///< With 3 arguments
 };
 
 //----------------------------------------------------------
@@ -405,16 +449,75 @@ private:
 
 namespace func {
 
+// 1-argument functions
+static ExprJIT::Real abs(ExprJIT::Real x) { return ::abs(x); }
+static ExprJIT::Real sqrt(ExprJIT::Real x) { return ::sqrt(x); }
+static ExprJIT::Real exp(ExprJIT::Real x) { return ::exp(x); }
+static ExprJIT::Real exp2(ExprJIT::Real x) { return ::exp2(x); }
+static ExprJIT::Real log(ExprJIT::Real x) { return ::log(x); }
+static ExprJIT::Real log2(ExprJIT::Real x) { return ::log2(x); }
+static ExprJIT::Real log10(ExprJIT::Real x) { return ::log10(x); }
 static ExprJIT::Real sin(ExprJIT::Real x) { return ::sin(x); }
 static ExprJIT::Real cos(ExprJIT::Real x) { return ::cos(x); }
-static ExprJIT::Real sqrt(ExprJIT::Real x) { return ::sqrt(x); }
+static ExprJIT::Real tan(ExprJIT::Real x) { return ::tan(x); }
+static ExprJIT::Real asin(ExprJIT::Real x) { return ::asin(x); }
+static ExprJIT::Real acos(ExprJIT::Real x) { return ::acos(x); }
+static ExprJIT::Real atan(ExprJIT::Real x) { return ::atan(x); }
+static ExprJIT::Real sinh(ExprJIT::Real x) { return ::sinh(x); }
+static ExprJIT::Real cosh(ExprJIT::Real x) { return ::cosh(x); }
+static ExprJIT::Real tanh(ExprJIT::Real x) { return ::tanh(x); }
+static ExprJIT::Real asinh(ExprJIT::Real x) { return ::asinh(x); }
+static ExprJIT::Real acosh(ExprJIT::Real x) { return ::acosh(x); }
+static ExprJIT::Real atanh(ExprJIT::Real x) { return ::atanh(x); }
+static ExprJIT::Real round(ExprJIT::Real x) { return ::round(x); }
+static ExprJIT::Real ceil(ExprJIT::Real x) { return ::ceil(x); }
+static ExprJIT::Real floor(ExprJIT::Real x) { return ::floor(x); }
+
+// 2-argument functions
+static ExprJIT::Real min(ExprJIT::Real x, ExprJIT::Real y) { return (x < y) ? x : y; }
+static ExprJIT::Real max(ExprJIT::Real x, ExprJIT::Real y) { return (x > y) ? x : y; }
+static ExprJIT::Real pow(ExprJIT::Real x, ExprJIT::Real y) { return ::pow(x, y); }
+static ExprJIT::Real mod(ExprJIT::Real x, ExprJIT::Real y) { return ::fmod(x, y); }
+static ExprJIT::Real atan2(ExprJIT::Real x, ExprJIT::Real y) { return ::atan2(x, y); }
+static ExprJIT::Real hypot(ExprJIT::Real x, ExprJIT::Real y) { return ::hypot(x, y); }
 
 }
 
-const std::map<std::string, Parser::FunctionPtr> Parser::stdFunctions = {
+const std::map<std::string, Parser::Function1Ptr> Parser::stdFunctions1 = {
+    { "abs",    func::abs },
     { "sqrt",   func::sqrt },
+    { "exp",    func::exp },
+    { "exp2",   func::exp2 },
+    { "log",    func::log },
+    { "log2",   func::log2 },
+    { "log10",  func::log10 },
     { "sin",    func::sin },
-    { "cos",    func::cos }
+    { "cos",    func::cos },
+    { "tan",    func::tan },
+    { "asin",   func::asin },
+    { "acos",   func::acos },
+    { "atan",   func::atan },
+    { "sinh",   func::sinh },
+    { "cosh",   func::cosh },
+    { "tanh",   func::tanh },
+    { "asinh",  func::asinh },
+    { "acosh",  func::acosh },
+    { "atanh",  func::atanh },
+    { "round",  func::round },
+    { "ceil",   func::ceil },
+    { "floor",  func::floor }
+};
+
+const std::map<std::string, Parser::Function2Ptr> Parser::stdFunctions2 = {
+    { "min",    func::min },
+    { "max",    func::max },
+    { "pow",    func::pow },
+    { "mod",    func::mod },
+    { "atan2",  func::atan2 },
+    { "hypot",  func::hypot }
+};
+
+const std::map<std::string, Parser::Function3Ptr> Parser::stdFunctions3 = {
 };
 
 //----------------------------------------------------------
