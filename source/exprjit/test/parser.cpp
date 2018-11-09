@@ -1,3 +1,4 @@
+#include <cmath>
 #include "catch.hpp"
 #include "exprjit.h"
 
@@ -101,11 +102,11 @@ TEST_CASE("Test 3-argument functions")
 TEST_CASE("Test computed values")
 {
     ExprJIT expr;
-    expr["x"] = 0.0;
+    double x = 0.1;
+    expr["x"] = x;
 
     REQUIRE(expr("sin(x)/x"));
 
-    double x = 1.0;
     while (x < 1.0) {
         expr["x"] = x;
 
@@ -116,4 +117,3 @@ TEST_CASE("Test computed values")
         x += 0.1;
     }
 }
-

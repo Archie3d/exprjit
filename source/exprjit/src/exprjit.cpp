@@ -15,6 +15,10 @@ constexpr size_t CODE_BUFFER_SIZE = 16384;
 
 namespace nj = NativeJIT;
 
+// Enable generated code assembly output
+//#define EXPRJIT_ENABLE_ASM_OUTPUT
+
+
 //----------------------------------------------------------
 //  Helper class to contruct error messages
 //----------------------------------------------------------
@@ -484,8 +488,7 @@ private:
                     } else {
                         // There is no division node so we have to implement is as a function call
                         auto &call = m_nodeFactory.Immediate(Parser::invf);
-                        auto &rrnode = m_nodeFactory.Call(call, rnode);
-                        nodes.push_back(m_nodeFactory.Mul(lnode, rrnode));
+                        nodes.push_back(m_nodeFactory.Call(call, rnode));
                     }
 
                 } else {
@@ -723,7 +726,9 @@ struct Compiler
           parser(expression, symbols)
     {
         // This will output generated assembly
-        //code.EnableDiagnostics(std::cout);
+#ifdef EXPRJIT_ENABLE_ASM_OUTPUT
+        code.EnableDiagnostics(std::cout);
+#endif
     }
 
     bool compile(const std::string &str)
