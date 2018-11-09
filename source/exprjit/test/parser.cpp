@@ -11,6 +11,12 @@ TEST_CASE("Test basic expressions")
 
     REQUIRE(expr("(1 + 2)*3"));
     REQUIRE(expr() == Approx(9.0));
+
+    REQUIRE(expr("(7 - 2)*(5 - 2)"));
+    REQUIRE(expr() == Approx(15.0));
+
+    REQUIRE(expr("8/2*0.5*1e-1"));
+    REQUIRE(expr() == Approx(0.2));
 }
 
 //----------------------------------------------------------
