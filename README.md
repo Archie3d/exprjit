@@ -47,3 +47,5 @@ auto res = expr();
 std::cout << "Result: " << res << "\n";
 ```
 All values in expression are treated and evaluated as `double` type.
+
+The parser will evaluate constant expressions on the fly in order to minimize the generated JIT-compiled code as much as possible.

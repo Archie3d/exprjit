@@ -89,3 +89,25 @@ TEST_CASE("Test 3-argument functions")
     expr["x"] = -10.0;
     REQUIRE(expr() == Approx(-1.0));
 }
+
+//----------------------------------------------------------
+
+TEST_CASE("Test computed values")
+{
+    ExprJIT expr;
+    expr["x"] = 0.0;
+
+    REQUIRE(expr("sin(x)/x"));
+
+    double x = 1.0;
+    while (x < 1.0) {
+        expr["x"] = x;
+
+        auto y = expr();
+        auto z = sin(x) / x;
+        REQUIRE(y == Approx(z));
+
+        x += 0.1;
+    }
+}
+

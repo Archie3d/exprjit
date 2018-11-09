@@ -2,6 +2,7 @@
 #include <istream>
 #include <sstream>
 #include <map>
+#include <functional>
 
 #include "NativeJIT/CodeGen/ExecutionBuffer.h"
 #include "NativeJIT/CodeGen/FunctionBuffer.h"
@@ -10,7 +11,7 @@
 #include "exprjit.h"
 
 // Size of the JIT compiler buffers
-constexpr size_t CODE_BUFFER_SIZE = 8192;
+constexpr size_t CODE_BUFFER_SIZE = 16384;
 
 namespace nj = NativeJIT;
 
@@ -51,18 +52,19 @@ class SymbolTable
 public:
 
     SymbolTable()
+        : m_vars()
     {
     }
 
-    bool hasVar(const std::string &name) const
+    bool contains(const std::string &name) const
     {
         return m_vars.find(name) != m_vars.end();
     }
 
-    ExprJIT::Real* varPtr(const std::string &name)
+    ExprJIT::Real* ptr(const std::string &name)
     {
         ExprJIT::Real *ptr = nullptr;
-        if (hasVar(name)) {
+        if (contains(name)) {
             ptr = &m_vars[name];
         }
         return ptr;
@@ -103,18 +105,24 @@ public:
     inline bool error() const { return m_error; }
     const std::string& message() const { return m_message; }
 
-    Node& parse(const std::string &str)
+    Node& parse(const std::string &str, bool &isConstant, ExprJIT::Real &constValue)
     {
         m_symbolsCache.clear();
 
         std::istringstream ss(str);
-        return parseExpression(ss);
+        return parseExpression(ss, isConstant, constValue);
     }
 
 private:
 
 // Helper macro to generate parsing error messages
 #define PARSE_ERR m_error=true; MessageConstructor(m_message) << in.tellg() << ": "
+
+    static void markUnused(Node &node)
+    {
+        // TODO: What is the right way to optimize-out a node?
+        node.IncrementParentCount();
+    }
 
     /**
      * @brief Tells whether  a character is a shitespace.
@@ -182,9 +190,10 @@ private:
     /**
      * @brief Parse a floating point number.
      * @param in
+     * @param value Parsed value
      * @return Floating point immediate value JIT node.
      */
-    Node& parseNumber(std::istream &in)
+    Node& parseNumber(std::istream &in, ExprJIT::Real &value)
     {
         ExprJIT::Real tmp = 0.0;
         long long int tmp_i = 0;
@@ -244,6 +253,7 @@ private:
             PARSE_ERR << "Unable to parse number";
         }
 
+        value = tmp;
         return m_nodeFactory.Immediate(tmp);
     }
 
@@ -252,9 +262,9 @@ private:
      * @param in
      * @return
      */
-    Node& parseExpression(std::istream &in)
+    Node& parseExpression(std::istream &in, bool &isConstant, ExprJIT::Real &constValue)
     {
-        return parseAddSub(in);
+        return parseAddSub(in, isConstant, constValue);
     }
 
     /**
@@ -262,8 +272,10 @@ private:
      * @param in
      * @return
      */
-    Node& parseSymbol(std::istream &in)
+    Node& parseSymbol(std::istream &in, bool &isConstant, ExprJIT::Real &constValue)
     {
+        isConstant = false;
+
         skipSpace(in);
         auto c = in.peek();
         std::string identifier;
@@ -282,7 +294,9 @@ private:
         if (c == '(') {
             // Function call
             in.get();
-            Node &arg0 = parseTerm(in);
+            bool isC0 = false;
+            ExprJIT::Real cVal0;
+            Node &arg0 = parseTerm(in, isC0, cVal0);
             Parser::skipSpace(in);
             c = in.peek();
             if (c == ')') {
@@ -290,12 +304,20 @@ private:
                 // 1-argument function
                 auto it = Parser::stdFunctions1.find(identifier);
                 if (it != Parser::stdFunctions1.end()) {
+                    if (isC0) {
+                        isConstant = true;
+                        constValue = it->second(cVal0);
+                        markUnused(arg0);
+                        return m_nodeFactory.Immediate(constValue);
+                    }
                     auto &func = m_nodeFactory.Immediate(it->second);
                     return m_nodeFactory.Call(func, arg0);
                 }
             } else if (c == ',') {
                 in.get();
-                Node &arg1 = parseTerm(in);
+                bool isC1 = false;
+                ExprJIT::Real cVal1;
+                Node &arg1 = parseTerm(in, isC1, cVal1);
                 Parser::skipSpace(in);
                 c = in.peek();
                 if (c == ')') {
@@ -303,12 +325,21 @@ private:
                     // 2-arguments
                     auto it = Parser::stdFunctions2.find(identifier);
                     if (it != Parser::stdFunctions2.end()) {
+                        if (isC0 && isC1) {
+                            isConstant = true;
+                            constValue = it->second(cVal0, cVal1);
+                            markUnused(arg0);
+                            markUnused(arg1);
+                            return m_nodeFactory.Immediate(constValue);
+                        }
                         auto &func = m_nodeFactory.Immediate(it->second);
                         return m_nodeFactory.Call(func, arg0, arg1);
                     }
                 } else if (c == ',') {
                     in.get();
-                    Node &arg2 = parseTerm(in);
+                    bool isC2 = false;
+                    ExprJIT::Real cVal2;
+                    Node &arg2 = parseTerm(in, isC2, cVal2);
                     Parser::skipSpace(in);
                     c = in.peek();
                     if (c == ')') {
@@ -316,6 +347,14 @@ private:
                         // 3-arguments
                         auto it = Parser::stdFunctions3.find(identifier);
                         if (it != Parser::stdFunctions3.end()) {
+                            if (isC0 && isC1 && isC2) {
+                                isConstant = true;
+                                constValue = it->second(cVal0, cVal1, cVal2);
+                                markUnused(arg0);
+                                markUnused(arg1);
+                                markUnused(arg2);
+                                return m_nodeFactory.Immediate(constValue);
+                            }
                             auto &func = m_nodeFactory.Immediate(it->second);
                             return m_nodeFactory.Call(func, arg0, arg1, arg2);
                         }
@@ -330,7 +369,7 @@ private:
         } else {
 
             // Variable reference
-            ExprJIT::Real *ptr = m_symbols.varPtr(identifier);
+            ExprJIT::Real *ptr = m_symbols.ptr(identifier);
             if (ptr != nullptr) {
                 // Look of there is a cached node for this variable
                 auto it = m_symbolsCache.find(identifier);
@@ -351,28 +390,42 @@ private:
         return m_nodeFactory.Immediate(0.0);
     }
 
-    Node& parseTerm(std::istream &in)
+    Node& parseTerm(std::istream &in, bool &isConstant, ExprJIT::Real &constValue)
     {
+        isConstant = false;
+
         skipSpace(in);
         auto c = in.peek();
         if ((c >= '0' && c <= '9')) {
-            return parseNumber(in);
+            isConstant = true;
+            return parseNumber(in, constValue);
         } else if (c == '-') {
             in.get();
             c = in.peek();
             if ((c >= '0' && c <= '9')) {
                 in.putback('-');
-                return parseNumber(in);
+                isConstant = true;
+                return parseNumber(in, constValue);
             } else {
-                Node &lnode = m_nodeFactory.Immediate(0.0);
-                Node &rnode = parseTerm(in);
-                return m_nodeFactory.Sub(lnode, rnode);
+                bool isC = false;
+                ExprJIT::Real cVal;
+                Node &rnode = parseTerm(in, isC, cVal);
+                if (isC) {
+                    markUnused(rnode);
+                    cVal = -cVal;
+                    isConstant = true;
+                    constValue = cVal;
+                    return m_nodeFactory.Immediate(cVal);
+                } else {
+                    Node &lnode = m_nodeFactory.Immediate(0.0);
+                    return m_nodeFactory.Sub(lnode, rnode);
+                }
             }
         } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_')) {
-            return parseSymbol(in);
+            return parseSymbol(in, isConstant, constValue);
         } else if (c == '(') {
             in.get();
-            auto &n = parseExpression(in);
+            auto &n = parseExpression(in, isConstant, constValue);
             if (!m_error) {
                 skipSpace(in);
                 c = in.peek();
@@ -390,9 +443,24 @@ private:
         return m_nodeFactory.Immediate(0.0);
     }
 
-    Node& parseMulDiv(std::istream &in)
+    Node& parseMulDiv(std::istream &in, bool &isConstant, ExprJIT::Real &constValue)
     {
-        Node &lnode = parseTerm(in);
+        bool isC = false;
+        ExprJIT::Real cVal;
+
+        isConstant = false;
+
+        ExprJIT::Real accumulator = 1.0;
+        std::vector<std::reference_wrapper<Node> > nodes;
+
+        Node &lnode = parseTerm(in, isC, cVal);
+        if (isC) {
+            accumulator = cVal;
+            markUnused(lnode);
+        } else {
+            nodes.push_back(lnode);
+        }
+
         if (!error()) {
             bool done = false;
             do {
@@ -400,27 +468,71 @@ private:
                 auto c = in.peek();
                 if (c == '*') {
                     in.get();
-                    Node &rnode = parseMulDiv(in);
-                    return m_nodeFactory.Mul(lnode, rnode);
+                    Node &rnode = parseTerm(in, isC, cVal);
+                    if (isC) {
+                        accumulator *= cVal;
+                        markUnused(rnode);
+                    } else {
+                        nodes.push_back(rnode);
+                    }
                 } else if (c == '/') {
                     in.get();
-                    Node &rnode = parseMulDiv(in);
-                    // There is no division node so we have to implement is as a function call
-                    auto &call = m_nodeFactory.Immediate(Parser::invf);
-                    auto &rrnode = m_nodeFactory.Call(call, rnode);
-                    return m_nodeFactory.Mul(lnode, rrnode);
+                    Node &rnode = parseTerm(in, isC, cVal);
+                    if (isC) {
+                        accumulator /= cVal;
+                        markUnused(rnode);
+                    } else {
+                        // There is no division node so we have to implement is as a function call
+                        auto &call = m_nodeFactory.Immediate(Parser::invf);
+                        auto &rrnode = m_nodeFactory.Call(call, rnode);
+                        nodes.push_back(m_nodeFactory.Mul(lnode, rrnode));
+                    }
+
                 } else {
                     done = true;
                 }
             } while (!done);
         }
 
-        return lnode;
+        if (nodes.empty()) {
+            isConstant = true;
+            constValue = accumulator;
+            return m_nodeFactory.Immediate(constValue);
+        }
+
+        std::reference_wrapper<Node> n = nodes.front();
+
+        for (size_t i = 1; i < nodes.size(); i++) {
+            Node &p = nodes.at(i);
+            n = m_nodeFactory.Mul(n.get(), p);
+        }
+
+        if (accumulator != 1.0) {
+            n = m_nodeFactory.Mul(n.get(), m_nodeFactory.Immediate(accumulator));
+        }
+
+        return n.get();
     }
 
-    Node& parseAddSub(std::istream &in)
+    Node& parseAddSub(std::istream &in, bool &isConstant, ExprJIT::Real &constValue)
     {
-        Node &lnode = parseMulDiv(in);
+        bool isC = false;
+        ExprJIT::Real cVal;
+
+        isConstant = false;
+
+        ExprJIT::Real accumulator = 0.0;
+        std::vector<std::reference_wrapper<Node> > addNodes;
+        std::vector<std::reference_wrapper<Node> > subNodes;
+
+        Node &lnode = parseMulDiv(in, isC, cVal);
+        if (isC) {
+            accumulator = cVal;
+            markUnused(lnode);
+        } else {
+            addNodes.push_back(lnode);
+        }
+
         if (!error()) {
             bool done = false;
             do {
@@ -428,19 +540,54 @@ private:
                 auto c = in.peek();
                 if (c == '+') {
                     in.get();
-                    Node &rnode = parseAddSub(in);
-                    return m_nodeFactory.Add(lnode, rnode);
+                    Node &rnode = parseMulDiv(in, isC, cVal);
+                    if (isC) {
+                        accumulator += cVal;
+                        markUnused(rnode);
+                    } else {
+                        addNodes.push_back(rnode);
+                    }
                 } else if (c == '-') {
                     in.get();
-                    Node &rnode = parseAddSub(in);
-                    return m_nodeFactory.Sub(lnode, rnode);
+                    Node &rnode = parseMulDiv(in, isC, cVal);
+                    if (isC) {
+                        accumulator -= cVal;
+                        markUnused(rnode);
+                    } else {
+                        subNodes.push_back(rnode);
+                    }
                 } else {
                     done = true;
                 }
             } while (!done);
         }
 
-        return lnode;
+        if (!addNodes.empty()) {
+            std::reference_wrapper<Node> n = addNodes.front();
+            for (size_t i = 1; i < addNodes.size(); i++) {
+                Node &p = addNodes.at(i);
+                n = m_nodeFactory.Add(n.get(), p);
+            }
+            for (auto &&p : subNodes) {
+                n = m_nodeFactory.Sub(n.get(), p.get());
+            }
+            if (accumulator != 0.0) {
+                n = m_nodeFactory.Add(n.get(), m_nodeFactory.Immediate(accumulator));
+            }
+            return n;
+        }
+
+        if (!subNodes.empty()) {
+            std::reference_wrapper<Node> n = m_nodeFactory.Immediate(accumulator);
+            for (auto &&p : subNodes) {
+                n = m_nodeFactory.Sub(n.get(), p.get());
+            }
+            return n;
+        }
+
+        isConstant = true;
+        constValue = accumulator;
+        return m_nodeFactory.Immediate(constValue);
     }
 
 
@@ -562,34 +709,41 @@ struct Compiler
 
     Parser parser;
 
+    static ExprJIT::Real returnZero()
+    {
+        return 0.0;
+    }
+
     Compiler(SymbolTable &symbols, const size_t capacity = CODE_BUFFER_SIZE)
         : codeAllocator(capacity),
           allocator(capacity),
           code(codeAllocator, static_cast<unsigned>(capacity)),
           expression(allocator, code),
-          func(nullptr),
+          func(Compiler::returnZero),
           parser(expression, symbols)
     {
         // This will output generated assembly
-        // code.EnableDiagnostics(std::cout);
+        //code.EnableDiagnostics(std::cout);
     }
 
     bool compile(const std::string &str)
     {
-        Parser::Node& node = parser.parse(str);
+        bool isConstant;
+        ExprJIT::Real constValue;
+
+        Parser::Node& node = parser.parse(str, isConstant, constValue);
         if (!parser.error()) {
             func = expression.Compile(node);
         }
 
-        return func != nullptr;
+        return !parser.error();
     }
 
     ExprJIT::Real eval() const
     {
-        if (func != nullptr) {
-            return func();
-        }
-        return 0.0;
+        // func should always point to a valid function,
+        // either to returnZero() one or the one being compiled.
+        return func();
     }
 
 };
