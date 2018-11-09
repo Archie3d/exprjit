@@ -24,7 +24,7 @@ double constval(double x)
 
 //----------------------------------------------------------
 
-TEST_CASE("Benchmarking x^")
+TEST_CASE("Benchmarking x^3")
 {
     double x = 2.0;
 

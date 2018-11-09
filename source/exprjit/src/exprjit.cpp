@@ -455,14 +455,15 @@ private:
         isConstant = false;
 
         ExprJIT::Real accumulator = 1.0;
-        std::vector<std::reference_wrapper<Node> > nodes;
+        std::vector<std::reference_wrapper<Node> > mulNodes;
+        std::vector<std::reference_wrapper<Node> > divNodes;
 
         Node &lnode = parseTerm(in, isC, cVal);
         if (isC) {
             accumulator = cVal;
             markUnused(lnode);
         } else {
-            nodes.push_back(lnode);
+            mulNodes.push_back(lnode);
         }
 
         if (!error()) {
@@ -477,7 +478,7 @@ private:
                         accumulator *= cVal;
                         markUnused(rnode);
                     } else {
-                        nodes.push_back(rnode);
+                        mulNodes.push_back(rnode);
                     }
                 } else if (c == '/') {
                     in.get();
@@ -486,9 +487,7 @@ private:
                         accumulator /= cVal;
                         markUnused(rnode);
                     } else {
-                        // There is no division node so we have to implement is as a function call
-                        auto &call = m_nodeFactory.Immediate(Parser::invf);
-                        nodes.push_back(m_nodeFactory.Call(call, rnode));
+                        divNodes.push_back(rnode);
                     }
 
                 } else {
@@ -497,24 +496,47 @@ private:
             } while (!done);
         }
 
-        if (nodes.empty()) {
-            isConstant = true;
-            constValue = accumulator;
-            return m_nodeFactory.Immediate(constValue);
+        // There is no division node so we have to implement is as a function call
+
+        if (!mulNodes.empty()) {
+            std::reference_wrapper<Node> n = mulNodes.front();
+            for (size_t i = 1; i < mulNodes.size(); i++) {
+                Node &p = mulNodes.at(i);
+                n = m_nodeFactory.Mul(n.get(), p);
+            }
+            if (!divNodes.empty()) {
+                std::reference_wrapper<Node> p = divNodes.front();
+                for (size_t i = 1; i < divNodes.size(); i++) {
+                    Node &d = divNodes.at(i);
+                    p = m_nodeFactory.Mul(p.get(), d);
+                }
+                auto &call = m_nodeFactory.Immediate(Parser::invf);
+                p = m_nodeFactory.Call(call, p.get());
+                n = m_nodeFactory.Mul(n.get(), p.get());
+            }
+            if (accumulator != 1.0) {
+                n = m_nodeFactory.Mul(n.get(), m_nodeFactory.Immediate(accumulator));
+            }
+            return n.get();
         }
 
-        std::reference_wrapper<Node> n = nodes.front();
-
-        for (size_t i = 1; i < nodes.size(); i++) {
-            Node &p = nodes.at(i);
-            n = m_nodeFactory.Mul(n.get(), p);
+        if (!divNodes.empty()) {
+            std::reference_wrapper<Node> n = divNodes.front();
+            for (size_t i = 1; i < divNodes.size(); i++) {
+                Node &p = divNodes.at(i);
+                n = m_nodeFactory.Mul(n.get(), p);
+            }
+            auto &call = m_nodeFactory.Immediate(Parser::invf);
+            n = m_nodeFactory.Call(call, n.get());
+            if (accumulator != 1.0) {
+                n = m_nodeFactory.Mul(n.get(), m_nodeFactory.Immediate(accumulator));
+            }
+            return n.get();
         }
 
-        if (accumulator != 1.0) {
-            n = m_nodeFactory.Mul(n.get(), m_nodeFactory.Immediate(accumulator));
-        }
-
-        return n.get();
+        isConstant = true;
+        constValue = accumulator;
+        return m_nodeFactory.Immediate(constValue);
     }
 
     Node& parseAddSub(std::istream &in, bool &isConstant, ExprJIT::Real &constValue)

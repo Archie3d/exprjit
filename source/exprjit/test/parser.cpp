@@ -117,3 +117,15 @@ TEST_CASE("Test computed values")
         x += 0.1;
     }
 }
+
+//----------------------------------------------------------
+
+TEST_CASE("Test multiple divisions")
+{
+    ExprJIT expr;
+    double x = 2;
+    expr["x"] = x;
+
+    REQUIRE(expr("16/x/x/x/x"));
+    REQUIRE(expr() == Approx(1.0));
+}
