@@ -47,6 +47,56 @@ private:
     std::string &m_str;
 };
 
+//----------------------------------------------------------
+//  Standard functions
+//----------------------------------------------------------
+
+namespace func {
+
+// 1-argument functions
+static ExprJIT::Real abs(ExprJIT::Real x) { return ::abs(x); }
+static ExprJIT::Real sqrt(ExprJIT::Real x) { return ::sqrt(x); }
+static ExprJIT::Real exp(ExprJIT::Real x) { return ::exp(x); }
+static ExprJIT::Real exp2(ExprJIT::Real x) { return ::exp2(x); }
+static ExprJIT::Real log(ExprJIT::Real x) { return ::log(x); }
+static ExprJIT::Real log2(ExprJIT::Real x) { return ::log2(x); }
+static ExprJIT::Real log10(ExprJIT::Real x) { return ::log10(x); }
+static ExprJIT::Real sin(ExprJIT::Real x) { return ::sin(x); }
+static ExprJIT::Real cos(ExprJIT::Real x) { return ::cos(x); }
+static ExprJIT::Real tan(ExprJIT::Real x) { return ::tan(x); }
+static ExprJIT::Real asin(ExprJIT::Real x) { return ::asin(x); }
+static ExprJIT::Real acos(ExprJIT::Real x) { return ::acos(x); }
+static ExprJIT::Real atan(ExprJIT::Real x) { return ::atan(x); }
+static ExprJIT::Real sinh(ExprJIT::Real x) { return ::sinh(x); }
+static ExprJIT::Real cosh(ExprJIT::Real x) { return ::cosh(x); }
+static ExprJIT::Real tanh(ExprJIT::Real x) { return ::tanh(x); }
+static ExprJIT::Real asinh(ExprJIT::Real x) { return ::asinh(x); }
+static ExprJIT::Real acosh(ExprJIT::Real x) { return ::acosh(x); }
+static ExprJIT::Real atanh(ExprJIT::Real x) { return ::atanh(x); }
+static ExprJIT::Real round(ExprJIT::Real x) { return ::round(x); }
+static ExprJIT::Real ceil(ExprJIT::Real x) { return ::ceil(x); }
+static ExprJIT::Real floor(ExprJIT::Real x) { return ::floor(x); }
+
+// 2-argument functions
+static ExprJIT::Real min(ExprJIT::Real x, ExprJIT::Real y) { return (x < y) ? x : y; }
+static ExprJIT::Real max(ExprJIT::Real x, ExprJIT::Real y) { return (x > y) ? x : y; }
+static ExprJIT::Real pow(ExprJIT::Real x, ExprJIT::Real y) { return ::pow(x, y); }
+static ExprJIT::Real mod(ExprJIT::Real x, ExprJIT::Real y) { return ::fmod(x, y); }
+static ExprJIT::Real atan2(ExprJIT::Real x, ExprJIT::Real y) { return ::atan2(x, y); }
+static ExprJIT::Real hypot(ExprJIT::Real x, ExprJIT::Real y) { return ::hypot(x, y); }
+
+// 3-argument functions
+static ExprJIT::Real clamp(ExprJIT::Real x, ExprJIT::Real a, ExprJIT::Real b)
+{
+    if (x < a) {
+        return a;
+    } else if (x > b) {
+        return b;
+    }
+    return x;
+}
+
+} // namespace func
 
 //----------------------------------------------------------
 //  Symbols table
@@ -58,31 +108,103 @@ public:
     SymbolTable()
         : m_vars()
     {
+        defineStandardFunctions();
     }
 
-    bool contains(const std::string &name) const
+    void defineStandardFunctions()
     {
-        return m_vars.find(name) != m_vars.end();
+        setFunc("abs",      func::abs);
+        setFunc("sqrt",     func::sqrt);
+        setFunc("exp",      func::exp);
+        setFunc("exp2",     func::exp);
+        setFunc("log",      func::log);
+        setFunc("log2",     func::log2);
+        setFunc("log10",    func::log10);
+        setFunc("sin",      func::sin);
+        setFunc("cos",      func::cos);
+        setFunc("tan",      func::tan);
+        setFunc("asin",     func::asin);
+        setFunc("acos",     func::acos);
+        setFunc("atan",     func::atan);
+        setFunc("sinh",     func::sinh);
+        setFunc("cosh",     func::cosh);
+        setFunc("tanh",     func::tanh);
+        setFunc("asinh",    func::asinh);
+        setFunc("acosh",    func::acosh);
+        setFunc("atanh",    func::atanh);
+        setFunc("round",    func::round);
+        setFunc("ceil",     func::ceil);
+        setFunc("floor",    func::floor);
+
+        setFunc("min",      func::min);
+        setFunc("max",      func::max);
+        setFunc("pow",      func::pow);
+        setFunc("mod",      func::mod);
+        setFunc("atan2",    func::atan2);
+        setFunc("hypot",    func::hypot);
+
+        setFunc("clamp",    func::clamp);
     }
 
-    ExprJIT::Real* ptr(const std::string &name)
+    ExprJIT::Real* varPtr(const std::string &name)
     {
-        ExprJIT::Real *ptr = nullptr;
-        if (contains(name)) {
-            ptr = &m_vars[name];
+        if (m_vars.find(name) != m_vars.end()) {
+            return &m_vars[name];
         }
-        return ptr;
+        return nullptr;
     }
 
-    ExprJIT::Real& operator[](const std::string &name)
+    ExprJIT::Function1Ptr func1Ptr(const std::string &name)
     {
-        return m_vars[name];
+        if (m_func1.find(name) != m_func1.end()) {
+            return m_func1.at(name);
+        }
+        return nullptr;
     }
 
+    ExprJIT::Function2Ptr func2Ptr(const std::string &name)
+    {
+        if (m_func2.find(name) != m_func2.end()) {
+            return m_func2.at(name);
+        }
+        return nullptr;
+    }
+
+    ExprJIT::Function3Ptr func3Ptr(const std::string &name)
+    {
+        if (m_func3.find(name) != m_func3.end()) {
+            return m_func3.at(name);
+        }
+        return nullptr;
+    }
+
+    void setVar(const std::string &name, const ExprJIT::Real value)
+    {
+        m_vars[name] = value;
+    }
+
+    void setFunc(const std::string &name, ExprJIT::Function1Ptr func)
+    {
+        m_func1[name] = func;
+    }
+
+    void setFunc(const std::string &name, ExprJIT::Function2Ptr func)
+    {
+        m_func2[name] = func;
+    }
+
+    void setFunc(const std::string &name, ExprJIT::Function3Ptr func)
+    {
+        m_func3[name] = func;
+    }
 
 private:
 
     std::map<std::string, ExprJIT::Real> m_vars;
+    std::map<std::string, ExprJIT::Function1Ptr> m_func1;   ///< With 1 argument
+    std::map<std::string, ExprJIT::Function2Ptr> m_func2;   ///< With 2 arguments
+    std::map<std::string, ExprJIT::Function3Ptr> m_func3;   ///< With 3 arguments
+
 };
 
 //----------------------------------------------------------
@@ -92,10 +214,6 @@ class Parser final
 {
 public:
     using Node = nj::Node<ExprJIT::Real>;
-
-    typedef ExprJIT::Real (*Function1Ptr)(ExprJIT::Real);
-    typedef ExprJIT::Real (*Function2Ptr)(ExprJIT::Real, ExprJIT::Real);
-    typedef ExprJIT::Real (*Function3Ptr)(ExprJIT::Real, ExprJIT::Real, ExprJIT::Real);
 
     Parser(nj::ExpressionNodeFactory &nodeFactory, SymbolTable &symbols)
         : m_nodeFactory(nodeFactory),
@@ -306,15 +424,15 @@ private:
             if (c == ')') {
                 in.get();
                 // 1-argument function
-                auto it = Parser::stdFunctions1.find(identifier);
-                if (it != Parser::stdFunctions1.end()) {
+                auto funcPtr = m_symbols.func1Ptr(identifier);
+                if (funcPtr != nullptr) {
                     if (isC0) {
                         isConstant = true;
-                        constValue = it->second(cVal0);
+                        constValue = funcPtr(cVal0);
                         markUnused(arg0);
                         return m_nodeFactory.Immediate(constValue);
                     }
-                    auto &func = m_nodeFactory.Immediate(it->second);
+                    auto &func = m_nodeFactory.Immediate(funcPtr);
                     return m_nodeFactory.Call(func, arg0);
                 }
             } else if (c == ',') {
@@ -327,16 +445,16 @@ private:
                 if (c == ')') {
                     in.get();
                     // 2-arguments
-                    auto it = Parser::stdFunctions2.find(identifier);
-                    if (it != Parser::stdFunctions2.end()) {
+                    auto funcPtr = m_symbols.func2Ptr(identifier);
+                    if (funcPtr != nullptr) {
                         if (isC0 && isC1) {
                             isConstant = true;
-                            constValue = it->second(cVal0, cVal1);
+                            constValue = funcPtr(cVal0, cVal1);
                             markUnused(arg0);
                             markUnused(arg1);
                             return m_nodeFactory.Immediate(constValue);
                         }
-                        auto &func = m_nodeFactory.Immediate(it->second);
+                        auto &func = m_nodeFactory.Immediate(funcPtr);
                         return m_nodeFactory.Call(func, arg0, arg1);
                     }
                 } else if (c == ',') {
@@ -349,17 +467,17 @@ private:
                     if (c == ')') {
                         in.get();
                         // 3-arguments
-                        auto it = Parser::stdFunctions3.find(identifier);
-                        if (it != Parser::stdFunctions3.end()) {
+                        auto funcPtr = m_symbols.func3Ptr(identifier);
+                        if (funcPtr != nullptr) {
                             if (isC0 && isC1 && isC2) {
                                 isConstant = true;
-                                constValue = it->second(cVal0, cVal1, cVal2);
+                                constValue = funcPtr(cVal0, cVal1, cVal2);
                                 markUnused(arg0);
                                 markUnused(arg1);
                                 markUnused(arg2);
                                 return m_nodeFactory.Immediate(constValue);
                             }
-                            auto &func = m_nodeFactory.Immediate(it->second);
+                            auto &func = m_nodeFactory.Immediate(funcPtr);
                             return m_nodeFactory.Call(func, arg0, arg1, arg2);
                         }
                     } else if (c == ',') {
@@ -373,7 +491,7 @@ private:
         } else {
 
             // Variable reference
-            ExprJIT::Real *ptr = m_symbols.ptr(identifier);
+            ExprJIT::Real *ptr = m_symbols.varPtr(identifier);
             if (ptr != nullptr) {
                 // Look of there is a cached node for this variable
                 auto it = m_symbolsCache.find(identifier);
@@ -625,100 +743,6 @@ private:
 
     /// Cache for variables Deref nodes.
     std::map<std::string, Node&> m_symbolsCache;
-
-    /// Standard functions
-    const static std::map<std::string, Function1Ptr> stdFunctions1; ///< With 1 argument
-    const static std::map<std::string, Function2Ptr> stdFunctions2; ///< With 2 arguments
-    const static std::map<std::string, Function3Ptr> stdFunctions3; ///< With 3 arguments
-};
-
-//----------------------------------------------------------
-//  Standard functions
-//----------------------------------------------------------
-
-namespace func {
-
-// 1-argument functions
-static ExprJIT::Real abs(ExprJIT::Real x) { return ::abs(x); }
-static ExprJIT::Real sqrt(ExprJIT::Real x) { return ::sqrt(x); }
-static ExprJIT::Real exp(ExprJIT::Real x) { return ::exp(x); }
-static ExprJIT::Real exp2(ExprJIT::Real x) { return ::exp2(x); }
-static ExprJIT::Real log(ExprJIT::Real x) { return ::log(x); }
-static ExprJIT::Real log2(ExprJIT::Real x) { return ::log2(x); }
-static ExprJIT::Real log10(ExprJIT::Real x) { return ::log10(x); }
-static ExprJIT::Real sin(ExprJIT::Real x) { return ::sin(x); }
-static ExprJIT::Real cos(ExprJIT::Real x) { return ::cos(x); }
-static ExprJIT::Real tan(ExprJIT::Real x) { return ::tan(x); }
-static ExprJIT::Real asin(ExprJIT::Real x) { return ::asin(x); }
-static ExprJIT::Real acos(ExprJIT::Real x) { return ::acos(x); }
-static ExprJIT::Real atan(ExprJIT::Real x) { return ::atan(x); }
-static ExprJIT::Real sinh(ExprJIT::Real x) { return ::sinh(x); }
-static ExprJIT::Real cosh(ExprJIT::Real x) { return ::cosh(x); }
-static ExprJIT::Real tanh(ExprJIT::Real x) { return ::tanh(x); }
-static ExprJIT::Real asinh(ExprJIT::Real x) { return ::asinh(x); }
-static ExprJIT::Real acosh(ExprJIT::Real x) { return ::acosh(x); }
-static ExprJIT::Real atanh(ExprJIT::Real x) { return ::atanh(x); }
-static ExprJIT::Real round(ExprJIT::Real x) { return ::round(x); }
-static ExprJIT::Real ceil(ExprJIT::Real x) { return ::ceil(x); }
-static ExprJIT::Real floor(ExprJIT::Real x) { return ::floor(x); }
-
-// 2-argument functions
-static ExprJIT::Real min(ExprJIT::Real x, ExprJIT::Real y) { return (x < y) ? x : y; }
-static ExprJIT::Real max(ExprJIT::Real x, ExprJIT::Real y) { return (x > y) ? x : y; }
-static ExprJIT::Real pow(ExprJIT::Real x, ExprJIT::Real y) { return ::pow(x, y); }
-static ExprJIT::Real mod(ExprJIT::Real x, ExprJIT::Real y) { return ::fmod(x, y); }
-static ExprJIT::Real atan2(ExprJIT::Real x, ExprJIT::Real y) { return ::atan2(x, y); }
-static ExprJIT::Real hypot(ExprJIT::Real x, ExprJIT::Real y) { return ::hypot(x, y); }
-
-// 3-argument functions
-static ExprJIT::Real clamp(ExprJIT::Real x, ExprJIT::Real a, ExprJIT::Real b)
-{
-    if (x < a) {
-        return a;
-    } else if (x > b) {
-        return b;
-    }
-    return x;
-}
-
-} // namespace func
-
-const std::map<std::string, Parser::Function1Ptr> Parser::stdFunctions1 = {
-    { "abs",    func::abs },
-    { "sqrt",   func::sqrt },
-    { "exp",    func::exp },
-    { "exp2",   func::exp2 },
-    { "log",    func::log },
-    { "log2",   func::log2 },
-    { "log10",  func::log10 },
-    { "sin",    func::sin },
-    { "cos",    func::cos },
-    { "tan",    func::tan },
-    { "asin",   func::asin },
-    { "acos",   func::acos },
-    { "atan",   func::atan },
-    { "sinh",   func::sinh },
-    { "cosh",   func::cosh },
-    { "tanh",   func::tanh },
-    { "asinh",  func::asinh },
-    { "acosh",  func::acosh },
-    { "atanh",  func::atanh },
-    { "round",  func::round },
-    { "ceil",   func::ceil },
-    { "floor",  func::floor }
-};
-
-const std::map<std::string, Parser::Function2Ptr> Parser::stdFunctions2 = {
-    { "min",    func::min },
-    { "max",    func::max },
-    { "pow",    func::pow },
-    { "mod",    func::mod },
-    { "atan2",  func::atan2 },
-    { "hypot",  func::hypot }
-};
-
-const std::map<std::string, Parser::Function3Ptr> Parser::stdFunctions3 = {
-    { "clamp",   func::clamp }
 };
 
 //----------------------------------------------------------
@@ -812,6 +836,40 @@ struct ExprJIT::Impl
 };
 
 //----------------------------------------------------------
+//  ExprJIT::SymbolReference
+//----------------------------------------------------------
+
+ExprJIT::SymbolReference::SymbolReference(ExprJIT &exprjit, const std::string &name)
+    : m_exprjit(exprjit),
+      m_name(name)
+{
+}
+
+ExprJIT::SymbolReference& ExprJIT::SymbolReference::operator =(const ExprJIT::Real value)
+{
+    m_exprjit.setSymbol(m_name, value);
+    return *this;
+}
+
+ExprJIT::SymbolReference& ExprJIT::SymbolReference::operator =(Function1Ptr func)
+{
+    m_exprjit.setSymbol(m_name, func);
+    return *this;
+}
+
+ExprJIT::SymbolReference& ExprJIT::SymbolReference::operator =(Function2Ptr func)
+{
+    m_exprjit.setSymbol(m_name, func);
+    return *this;
+}
+
+ExprJIT::SymbolReference& ExprJIT::SymbolReference::operator =(Function3Ptr func)
+{
+    m_exprjit.setSymbol(m_name, func);
+    return *this;
+}
+
+//----------------------------------------------------------
 //  ExprJIT public interface
 //----------------------------------------------------------
 
@@ -837,7 +895,27 @@ ExprJIT::Real ExprJIT::eval() const
     return d->eval();
 }
 
-ExprJIT::Real& ExprJIT::operator[](const std::string &name)
+ExprJIT::SymbolReference ExprJIT::operator[](const std::string &name)
 {
-    return d->symbols[name];
+    return SymbolReference(*this, name);
+}
+
+void ExprJIT::setSymbol(const std::string &name, const ExprJIT::Real value)
+{
+    d->symbols.setVar(name, value);
+}
+
+void ExprJIT::setSymbol(const std::string &name, Function1Ptr func)
+{
+    d->symbols.setFunc(name, func);
+}
+
+void ExprJIT::setSymbol(const std::string &name, Function2Ptr func)
+{
+    d->symbols.setFunc(name, func);
+}
+
+void ExprJIT::setSymbol(const std::string &name, Function3Ptr func)
+{
+    d->symbols.setFunc(name, func);
 }

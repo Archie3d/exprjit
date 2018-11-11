@@ -13,6 +13,25 @@ public:
 
     using Real = double;
 
+    using Function1Ptr = ExprJIT::Real (*)(ExprJIT::Real);
+    using Function2Ptr = ExprJIT::Real (*)(ExprJIT::Real, ExprJIT::Real);
+    using Function3Ptr = ExprJIT::Real (*)(ExprJIT::Real, ExprJIT::Real, ExprJIT::Real);
+
+    // Symbol identifier wrapper used to expose variables
+    // and native functions.
+    class SymbolReference
+    {
+    public:
+        explicit SymbolReference(ExprJIT &exprjit, const std::string &name);
+        SymbolReference& operator =(const ExprJIT::Real value);
+        SymbolReference& operator =(Function1Ptr func);
+        SymbolReference& operator =(Function2Ptr func);
+        SymbolReference& operator =(Function3Ptr func);
+    private:
+        ExprJIT& m_exprjit;
+        std::string m_name;
+    };
+
     ExprJIT();
     ~ExprJIT();
 
@@ -48,11 +67,19 @@ public:
      * @param name Symbol's name.
      * @return
      */
-    Real& operator[](const std::string &name);
+    SymbolReference operator[](const std::string &name);
 
 private:
+
+    friend class ExprJIT::SymbolReference;
+
     ExprJIT(const ExprJIT&) = delete;
     ExprJIT& operator =(const ExprJIT&) = delete;
+
+    void setSymbol(const std::string &name, const ExprJIT::Real value);
+    void setSymbol(const std::string &name, Function1Ptr func);
+    void setSymbol(const std::string &name, Function2Ptr func);
+    void setSymbol(const std::string &name, Function3Ptr func);
 
     // Implementation details.
     struct Impl;

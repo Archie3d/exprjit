@@ -99,6 +99,45 @@ TEST_CASE("Test 3-argument functions")
 
 //----------------------------------------------------------
 
+ExprJIT::Real func1(ExprJIT::Real x)
+{
+    return sqrt(x*x/2.0);
+}
+
+ExprJIT::Real func2(ExprJIT::Real x, ExprJIT::Real y)
+{
+    return sin(x*x)*cos(y*y);
+}
+
+ExprJIT::Real func3(ExprJIT::Real x, ExprJIT::Real y, ExprJIT::Real z)
+{
+    return sqrt(x*x + y*y + z*z);
+}
+
+TEST_CASE("Test custom functions")
+{
+    ExprJIT::Real x = 0.3;
+    ExprJIT::Real y = 0.5;
+    ExprJIT::Real z = 0.7;
+
+    ExprJIT expr;
+    expr["x"] = x;
+    expr["y"] = y;
+    expr["z"] = z;
+    expr["func1"] = func1;
+    expr["func2"] = func2;
+    expr["func3"] = func3;
+
+    REQUIRE(expr("func1(x)"));
+    REQUIRE(expr() == Approx(func1(x)));
+    REQUIRE(expr("func2(x, y)"));
+    REQUIRE(expr() == Approx(func2(x, y)));
+    REQUIRE(expr("func3(x, y, z)"));
+    REQUIRE(expr() == Approx(func3(x, y, z)));
+}
+
+//----------------------------------------------------------
+
 TEST_CASE("Test computed values")
 {
     ExprJIT expr;

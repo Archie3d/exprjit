@@ -46,6 +46,24 @@ bool ok = expr("sin(pi/4) + cos(pi/6) / sqrt(2)");
 auto res = expr();
 std::cout << "Result: " << res << "\n";
 ```
+
+Native functions can be exposed and used in expressions as well:
+```cpp
+double func(double x)
+{
+    return (x > 0.0) ?  0.5*x : -0.1;
+}
+
+...
+
+ExprJIT expr;
+expr["func"] = func;
+expr["t"] = 0.1;
+bool ok = expr("func(sin(t) + 1)");
+auto res = expr();
+std::cout << "Result: " << res << "\n";
+```
+
 All values in expression are treated and evaluated as `double` type.
 
-The parser will evaluate constant expressions on the fly in order to minimize the generated JIT-compiled code as much as possible.
+The parser will evaluate constant expressions on the fly during compilation in order to minimize the JIT-generated code footprint.
