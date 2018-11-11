@@ -116,7 +116,7 @@ public:
         setFunc("abs",      func::abs);
         setFunc("sqrt",     func::sqrt);
         setFunc("exp",      func::exp);
-        setFunc("exp2",     func::exp);
+        setFunc("exp2",     func::exp2);
         setFunc("log",      func::log);
         setFunc("log2",     func::log2);
         setFunc("log10",    func::log10);
